@@ -1,0 +1,197 @@
+@if (api(); as session) {
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">P</span>
+        <div><strong>EILCO Parking</strong><small>Access control</small></div>
+      </div>
+      <nav aria-label="Parking">
+        @for (item of pages; track item) {
+          <button type="button" [class.selected]="page() === item"
+            [attr.aria-current]="page() === item ? 'page' : null" (click)="goTo(item)">
+            <span class="nav-icon" [class]="'nav-icon icon-' + item.toLowerCase().split(' ')[0]" aria-hidden="true"></span>
+            {{ item }}
+          </button>
+        }
+      </nav>
+      <div class="sidebar-foot">
+        <span class="account">{{ session.email }}</span>
+        <button type="button" class="text-button" (click)="signOut()">Sign out</button>
+      </div>
+    </aside>
+
+    <main class="workspace">
+      <header class="workspace-bar">
+        <span>{{ now | date:'EEEE, d MMMM y' }}</span>
+        <span class="connection" [attr.data-state]="connection()" role="status">
+          <span aria-hidden="true"></span>
+          @switch (connection()) {
+            @case ('connected') { Firebase connected }
+            @case ('unavailable') { Firebase unavailable }
+            @default { Connecting to Firebase }
+          }
+        </span>
+      </header>
+
+      <div class="content">
+        <header class="page-head">
+          <div>
+            @switch (page()) {
+              @case ('Overview') {
+                <h1>Access overview</h1>
+                <p>Card permissions and recent activity at the parking entrance.</p>
+              }
+              @case ('Cards') {
+                <h1>Registered cards</h1>
+                <p>Manage which NFC cards can enter the parking area.</p>
+              }
+              @case ('Scan log') {
+                <h1>Scan log</h1>
+                <p>The latest 100 scans recorded by the parking reader.</p>
+              }
+            }
+          </div>
+          @if (page() !== 'Scan log') {
+            <button type="button" class="primary" (click)="openCard()" [disabled]="busy() || connection() !== 'connected'">
+              <span aria-hidden="true">+</span> Register card
+            </button>
+          }
+        </header>
+        @if (syncError()) { <p class="notice error" role="alert">{{ syncError() }} <button type="button" class="text-button" (click)="reload()">Retry</button></p> }
+        @if (error()) { <p class="notice error" role="alert">{{ error() }}</p> }
+        @if (message()) { <p class="notice success" role="status">{{ message() }}</p> }
+
+        @if (page() === 'Overview') {
+          <dl class="stats">
+            <div><dt>Active cards</dt><dd>{{ lastSync() ? activeCount() : '—' }}</dd><small>Across all registered cards</small></div>
+            <div><dt>Access granted</dt><dd>{{ lastSync() ? grantedCount() : '—' }}</dd><small>Among the last {{ scans().length || 100 }} recorded scans</small></div>
+            <div><dt>Access denied</dt><dd>{{ lastSync() ? scans().length - grantedCount() : '—' }}</dd><small>Among the last {{ scans().length || 100 }} recorded scans</small></div>
+          </dl>
+        }
+
+        @if (page() === 'Cards') {
+          <section class="panel" aria-labelledby="card-list">
+            <div class="panel-head">
+              <h2 id="card-list">Card directory</h2>
+              <label class="filter-field"><span class="sr-only">Search cards</span>
+                <input type="search" placeholder="Search by label or UID" [ngModel]="search()" (ngModelChange)="search.set($event)">
+              </label>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th scope="col">Label</th><th scope="col" class="wide-column">Card UID</th><th scope="col">Access</th><th scope="col">Action</th></tr></thead>
+                <tbody>
+                  @for (card of matchingCards(); track card.uid) {
+                    <tr>
+                      <th scope="row">{{ card.label }}<span class="mobile-detail"><code>{{ card.uid }}</code></span></th>
+                      <td class="wide-column"><code>{{ card.uid }}</code></td>
+                      <td><span class="tag" [class.good]="card.active">{{ card.active ? 'Active' : 'Revoked' }}</span></td>
+                      <td><button type="button" class="text-button" [class.danger]="card.active" [disabled]="busy() || connection() !== 'connected'"
+                        [attr.aria-label]="(card.active ? 'Revoke ' : 'Reactivate ') + card.label + ', ' + card.uid"
+                        (click)="changeAccess(card)">{{ card.active ? 'Revoke' : 'Reactivate' }}</button></td>
+                    </tr>
+                  } @empty {
+                    <tr><td class="empty" colspan="4">
+                      @if (!lastSync()) { {{ connection() === 'checking' ? 'Loading cards…' : 'Card records are unavailable.' }} }
+                      @else if (search()) { No cards match your search. }
+                      @else { No cards registered. Scan a card at the reader to find its UID, or enter a known UID. }
+                    </td></tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </section>
+        } @else {
+          <section class="panel" aria-labelledby="scan-list">
+            <div class="panel-head">
+              <h2 id="scan-list">{{ page() === 'Overview' ? 'Recent activity' : 'Recorded scans' }}</h2>
+              @if (page() === 'Overview') {
+                <button type="button" class="text-button" (click)="goTo('Scan log')">View scan log</button>
+              } @else {
+                <label class="filter-field"><span class="sr-only">Filter by decision</span>
+                  <select [ngModel]="filter()" (ngModelChange)="filter.set($event)">
+                    <option value="all">All decisions</option><option value="granted">Granted</option><option value="denied">Denied</option>
+                  </select>
+                </label>
+              }
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th scope="col" class="wide-column">Date and time</th><th scope="col">Card</th><th scope="col">Decision</th><th scope="col">Action</th></tr></thead>
+                <tbody>
+                  @for (scan of visibleScans(); track scan.id) {
+                    <tr>
+                      <td class="timestamp wide-column">{{ scan.scannedAt | date:'d MMM y, HH:mm:ss' }}</td>
+                      <td>
+                        @if (cardsByUid().get(scan.uid); as card) { <strong class="card-label">{{ card.label }}</strong> }
+                        <code>{{ scan.uid }}</code>
+                        <span class="mobile-detail">{{ scan.scannedAt | date:'d MMM y, HH:mm:ss' }}</span>
+                      </td>
+                      <td><span class="tag" [class.good]="scan.result === 'granted'">{{ results[scan.result] }}</span></td>
+                      <td>
+                        @if (scan.result === 'unknown' && !cardsByUid().has(scan.uid)) {
+                          <button type="button" class="text-button" [attr.aria-label]="'Register card ' + scan.uid" (click)="openCard(scan.uid)"
+                            [disabled]="busy() || connection() !== 'connected'">Register</button>
+                        } @else { <span class="muted">—</span> }
+                      </td>
+                    </tr>
+                  } @empty {
+                    <tr><td class="empty" colspan="4">
+                      @if (!lastSync()) { {{ connection() === 'checking' ? 'Loading scans…' : 'Scan records are unavailable.' }} }
+                      @else if (filter() !== 'all') { No scans match this filter. }
+                      @else { No scans recorded. Scan a card at the parking reader to see it here. }
+                    </td></tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+            @if (lastSync()) {
+              <footer class="panel-foot">Last synced {{ lastSync() | date:'HH:mm:ss' }}</footer>
+            }
+          </section>
+        }
+      </div>
+    </main>
+
+    <dialog #cardDialog aria-labelledby="register-heading" (cancel)="busy() && $event.preventDefault()">
+      <form (ngSubmit)="registerCard()">
+        <h2 id="register-heading">Register an NFC card</h2>
+        <p class="muted">The card can enter as soon as it’s registered.</p>
+        <label>Card UID <input name="uid" [(ngModel)]="cardUid" required maxlength="60" spellcheck="false"
+          autocomplete="off" placeholder="04:A3:1C:B7" autofocus></label>
+        <label>Card label <input name="label" [(ngModel)]="cardLabel" required maxlength="80" placeholder="e.g. Maintenance"></label>
+        @if (formError()) { <p class="notice error" role="alert">{{ formError() }}</p> }
+        <div class="dialog-actions">
+          <button type="button" class="secondary" (click)="closeCard()" [disabled]="busy()">Cancel</button>
+          <button type="submit" class="primary" [disabled]="busy()">{{ busy() ? 'Registering…' : 'Register card' }}</button>
+        </div>
+      </form>
+    </dialog>
+  </div>
+} @else {
+  <main class="entry">
+    <div class="entry-inner">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">P</span>
+        <div><strong>EILCO Parking</strong><small>Access control</small></div>
+      </div>
+      @if (ready()) {
+        <h1>Admin sign-in</h1>
+        <form (ngSubmit)="signIn()">
+          <label>Email <input type="email" name="email" [(ngModel)]="email" autocomplete="username" required></label>
+          <label>Password <input type="password" name="password" [(ngModel)]="password" autocomplete="current-password" required></label>
+          @if (error()) { <p class="notice error" role="alert">{{ error() }}</p> }
+          <button class="primary" type="submit" [disabled]="busy()">{{ busy() ? 'Signing in…' : 'Sign in' }}</button>
+        </form>
+      } @else {
+        <h1>Connect Firebase</h1>
+        @if (error()) {
+          <p class="muted" role="status">{{ error() }}</p>
+          <button class="primary" type="button" (click)="configure()">Retry connection</button>
+        } @else {
+          <p class="muted" role="status">Checking project settings…</p>
+        }
+      }
+    </div>
+  </main>
+}

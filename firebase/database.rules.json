@@ -1,59 +1,59 @@
 {
-    "rules":  {
-                  ".read":  false,
-                  ".write":  false,
-                  "roles":  {
-                                "admins":  {
-                                               "$account":  {
-                                                                ".read":  "auth != null \u0026\u0026 auth.uid === $account \u0026\u0026 auth.token.firebase.sign_in_provider === \u0027password\u0027"
-                                                            }
-                                           }
-                            },
-                  "cards":  {
-                                ".read":  "auth != null \u0026\u0026 auth.token.firebase.sign_in_provider === \u0027password\u0027 \u0026\u0026 root.child(\u0027roles/admins\u0027).child(auth.uid).val() === true",
-                                "$uid":  {
-                                             ".write":  "auth != null \u0026\u0026 auth.token.firebase.sign_in_provider === \u0027password\u0027 \u0026\u0026 root.child(\u0027roles/admins\u0027).child(auth.uid).val() === true \u0026\u0026 newData.exists() \u0026\u0026 !data.exists()",
-                                             ".validate":  "$uid.matches(/^([0-9A-F]{8}|[0-9A-F]{14}|[0-9A-F]{20})$/) \u0026\u0026 newData.hasChildren([\u0027label\u0027, \u0027active\u0027, \u0027createdAt\u0027])",
-                                             "label":  {
-                                                           ".validate":  "newData.isString() \u0026\u0026 newData.val().length \u003e 0 \u0026\u0026 newData.val().length \u003c= 80 \u0026\u0026 (!data.exists() || data.val() === newData.val())"
-                                                       },
-                                             "active":  {
-                                                            ".read":  "auth != null \u0026\u0026 auth.token.firebase.sign_in_provider === \u0027password\u0027 \u0026\u0026 root.child(\u0027roles/readers\u0027).child(auth.uid).val() === true \u0026\u0026 $uid.matches(/^([0-9A-F]{8}|[0-9A-F]{14}|[0-9A-F]{20})$/)",
-                                                            ".validate":  "newData.isBoolean()",
-                                                            ".write":  "auth != null \u0026\u0026 auth.token.firebase.sign_in_provider === \u0027password\u0027 \u0026\u0026 root.child(\u0027roles/admins\u0027).child(auth.uid).val() === true \u0026\u0026 data.exists() \u0026\u0026 newData.exists()"
-                                                        },
-                                             "createdAt":  {
-                                                               ".validate":  "newData.isNumber() \u0026\u0026 ((!data.exists() \u0026\u0026 newData.val() === now) || (data.exists() \u0026\u0026 data.val() === newData.val()))"
-                                                           },
-                                             "$other":  {
-                                                            ".validate":  false
-                                                        }
-                                         }
-                            },
-                  "accessEvents":  {
-                                       ".read":  "auth != null \u0026\u0026 auth.token.firebase.sign_in_provider === \u0027password\u0027 \u0026\u0026 root.child(\u0027roles/admins\u0027).child(auth.uid).val() === true \u0026\u0026 query.orderByChild === \u0027scannedAt\u0027 \u0026\u0026 query.limitToLast !== null \u0026\u0026 query.limitToLast \u003c= 100",
-                                       ".indexOn":  [
-                                                        "scannedAt"
-                                                    ],
-                                       "$event":  {
-                                                      ".write":  "auth != null \u0026\u0026 auth.token.firebase.sign_in_provider === \u0027password\u0027 \u0026\u0026 root.child(\u0027roles/readers\u0027).child(auth.uid).val() === true \u0026\u0026 !data.exists() \u0026\u0026 newData.exists()",
-                                                      ".validate":  "newData.hasChildren([\u0027uid\u0027, \u0027result\u0027, \u0027scannedAt\u0027, \u0027readerId\u0027])",
-                                                      "uid":  {
-                                                                  ".validate":  "newData.isString() \u0026\u0026 newData.val().matches(/^([0-9A-F]{8}|[0-9A-F]{14}|[0-9A-F]{20})$/)"
-                                                              },
-                                                      "result":  {
-                                                                     ".validate":  "newData.val() === \u0027granted\u0027 || newData.val() === \u0027unknown\u0027 || newData.val() === \u0027revoked\u0027 || newData.val() === \u0027unavailable\u0027"
-                                                                 },
-                                                      "scannedAt":  {
-                                                                        ".validate":  "newData.isNumber() \u0026\u0026 newData.val() === now"
-                                                                    },
-                                                      "readerId":  {
-                                                                       ".validate":  "newData.val() === auth.uid"
-                                                                   },
-                                                      "$other":  {
-                                                                     ".validate":  false
-                                                                 }
-                                                  }
-                                   }
-              }
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "roles": {
+      "admins": {
+        "$account": {
+          ".read": "auth != null && auth.uid === $account && auth.token.firebase.sign_in_provider === 'password'"
+        }
+      }
+    },
+    "cards": {
+      ".read": "auth != null && auth.token.firebase.sign_in_provider === 'password' && root.child('roles/admins').child(auth.uid).val() === true",
+      "$uid": {
+        ".write": "auth != null && auth.token.firebase.sign_in_provider === 'password' && root.child('roles/admins').child(auth.uid).val() === true && newData.exists() && !data.exists()",
+        ".validate": "$uid.matches(/^([0-9A-F]{8}|[0-9A-F]{14}|[0-9A-F]{20})$/) && newData.hasChildren(['label', 'active', 'createdAt'])",
+        "label": {
+          ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 80 && (!data.exists() || data.val() === newData.val())"
+        },
+        "active": {
+          ".read": "auth != null && auth.token.firebase.sign_in_provider === 'password' && root.child('roles/readers').child(auth.uid).val() === true && $uid.matches(/^([0-9A-F]{8}|[0-9A-F]{14}|[0-9A-F]{20})$/)",
+          ".validate": "newData.isBoolean()",
+          ".write": "auth != null && auth.token.firebase.sign_in_provider === 'password' && root.child('roles/admins').child(auth.uid).val() === true && data.exists() && newData.exists()"
+        },
+        "createdAt": {
+          ".validate": "newData.isNumber() && ((!data.exists() && newData.val() === now) || (data.exists() && data.val() === newData.val()))"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+    "accessEvents": {
+      ".read": "auth != null && auth.token.firebase.sign_in_provider === 'password' && root.child('roles/admins').child(auth.uid).val() === true && query.orderByChild === 'scannedAt' && query.limitToLast !== null && query.limitToLast <= 100",
+      ".indexOn": [
+        "scannedAt"
+      ],
+      "$event": {
+        ".write": "auth != null && auth.token.firebase.sign_in_provider === 'password' && root.child('roles/readers').child(auth.uid).val() === true && !data.exists() && newData.exists()",
+        ".validate": "newData.hasChildren(['uid', 'result', 'scannedAt', 'readerId'])",
+        "uid": {
+          ".validate": "newData.isString() && newData.val().matches(/^([0-9A-F]{8}|[0-9A-F]{14}|[0-9A-F]{20})$/)"
+        },
+        "result": {
+          ".validate": "newData.val() === 'granted' || newData.val() === 'unknown' || newData.val() === 'revoked' || newData.val() === 'unavailable'"
+        },
+        "scannedAt": {
+          ".validate": "newData.isNumber() && newData.val() === now"
+        },
+        "readerId": {
+          ".validate": "newData.val() === auth.uid"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    }
+  }
 }

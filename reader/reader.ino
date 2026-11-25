@@ -51,6 +51,7 @@ Result checkAccess(const String &uid, bool online) {
 
   String path = "/cards/" + uid + "/active";
   if (!Firebase.RTDB.get(&request, path)) {
+    if (request.httpCode() == FIREBASE_ERROR_PATH_NOT_EXIST) return Result::Unknown;
     Serial.println("Firebase access check failed: " + request.errorReason());
     return Result::Unavailable;
   }
